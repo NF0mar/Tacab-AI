@@ -1,18 +1,59 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:tacab_ai/core/widgets/textfield_widget.dart';
 import 'package:tacab_ai/core/widgets/custom_button.dart';
 import 'package:tacab_ai/core/widgets/socialmedia_buttons.dart';
 import 'package:get/get.dart';
+import 'package:tacab_ai/features/authentication/controllers/auth.dart';
 
-class SignupScreen extends StatelessWidget {
-  SignupScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
+  @override
+  State<SignupScreen> createState() => _SignupScreenState();
+}
+
+class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController emailController = TextEditingController();
-  final TextEditingController nameController = TextEditingController();
+
+  final TextEditingController usernameController = TextEditingController();
+
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmpasswordController =
+
+  final TextEditingController confirmPasswordController =
       TextEditingController();
+
+  final formkey = GlobalKey<FormState>();
+  String errorMessage = '';
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    usernameController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void register() async {
+    try {
+      await authService.value.createAccount(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      await authService.value.updateUsername(
+        username: usernameController.text.trim(),
+      );
+
+      Get.offNamed('/login');
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = e.message ?? 'An error occurred';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +107,7 @@ class SignupScreen extends StatelessWidget {
                 hintText: 'Enter your name',
                 icon: Icons.person_2_outlined,
                 isPassword: false,
-                controller: nameController,
+                controller: usernameController,
               ),
               Gap(20),
               CustomTextField(
@@ -87,14 +128,28 @@ class SignupScreen extends StatelessWidget {
                 hintText: 'Confirm Password',
                 icon: Icons.lock_outline,
                 isPassword: true,
-                controller: confirmpasswordController,
+                controller: confirmPasswordController,
               ),
-              Gap(30),
+              Gap(5),
+              Center(
+                child: Text(errorMessage,
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 12,
+                      fontFamily: 'Roboto',
+                      fontWeight: FontWeight.w300,
+                      height: 1.20,
+                      letterSpacing: -0.17,
+                    )),
+              ),
+              Gap(10),
               CustomButton(
                 text: 'Create an account',
                 backgroundColor: Color(0xFF73964A),
                 textColor: Colors.white,
-                onPressed: () {/* ... */},
+                onPressed: () {
+                  register();
+                },
               ),
               Gap(20),
               Row(

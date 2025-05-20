@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "612599198984",
+    "project_id": "tacab-ai",
+    "storage_bucket": "tacab-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:612599198984:android:167e2b86fbb899f05068bd",
+        "android_client_info": {
+          "package_name": "com.example.tacab_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZKzRddJRJNUZ0pkunnQ9pRAvA7cR2ZZc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

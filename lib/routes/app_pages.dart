@@ -4,6 +4,11 @@ import '../features/authentication/screens/login_screen.dart';
 import '../features/authentication/screens/signup_screen.dart';
 import '../features/authentication/screens/signup_phone_screen.dart';
 import '../features/home/screens/home_screen.dart';
+import '../features/home/screens/market_detail_screen.dart';
+import '../features/home/screens/BlogScreen.dart';
+import '../features/home/screens/profile_screen.dart';
+import '../features/home/screens/SettingScreen.dart';
+import '../features/home/screens/chat_ai_screen.dart';
 // import '../features/voice_query/screens/voice_chat_screen.dart';
 // import '../features/weather/screens/weather_screen.dart';
 import '../features/splash/screens/splash_screen.dart';
@@ -29,5 +34,10 @@ class AppPages {
     GetPage(name: AppRoutes.HOME, page: () => HomeScreen()),
     GetPage(name: AppRoutes.SIGNUP, page: () => SignupScreen()),
     GetPage(name: AppRoutes.SIGNUPPHONE, page: () => SignupPhoneScreen()),
+    GetPage(name: AppRoutes.MARKET_DETAIL, page: () => MarketDetailScreen()),
+    GetPage(name: AppRoutes.BLOG, page: () => BlogScreen()),
+    GetPage(name: AppRoutes.PROFILE, page: () => ProfileScreen()),
+    GetPage(name: AppRoutes.SETTINGS, page: () => SettingScreen()),
+    GetPage(name: AppRoutes.CHAT, page: () => ChatAIScreen()),
   ];
 }
