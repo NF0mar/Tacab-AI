@@ -1,12 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:tacab_ai/features/authentication/controllers/auth.dart';
 import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:tacab_ai/features/home/screens/BlogDetailScreen.dart';
+import 'package:tacab_ai/features/home/screens/MarketDetailScreenInner.dart';
+import 'package:tacab_ai/features/home/screens/market_detail_screen.dart';
+import 'package:tacab_ai/features/home/screens/market_products.dart';
 import 'weather_service.dart';
+import 'package:tacab_ai/features/home/models/market_product.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,64 +20,55 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // final User? user = Auth().currentUser;
-  // Widget _userid() {
-  //   return Text(user?.email ?? 'user email');
-  // }
-
   Future<Map<String, dynamic>>? weatherFuture;
   String userLocation = "Banaadir, Somalia";
+  String weatherDescription = "";
+  List<MarketProduct> marketProducts = [];
+  List<Map<String, dynamic>> recentBlogs = [];
+  bool isLoadingBlogs = true;
 
   @override
   void initState() {
     super.initState();
-    weatherFuture = WeatherService().fetchFullForecast(2.0469, 45.3182);
-    _determinePosition();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      weatherFuture = WeatherService().fetchFullForecast(2.0469, 45.3182);
+      _determinePosition();
+      fetchMarketProducts();
+      fetchRecentBlogs();
+    });
+    // weatherFuture = WeatherService().fetchFullForecast(2.0469, 45.3182);
+    // _determinePosition();
+    // fetchMarketProducts();
   }
 
-  // Future<void> _determinePosition() async {
-  //   try {
-  //     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  //     if (!serviceEnabled) return;
+  Future<void> fetchRecentBlogs() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('blogs')
+        .orderBy('date', descending: true)
+        .limit(2) // only last 2 blogs
+        .get();
 
-  //     LocationPermission permission = await Geolocator.checkPermission();
-  //     if (permission == LocationPermission.denied) {
-  //       permission = await Geolocator.requestPermission();
-  //       if (permission == LocationPermission.denied) return;
-  //     }
-  //     if (permission == LocationPermission.deniedForever) return;
+    setState(() {
+      recentBlogs = snapshot.docs.map((doc) => doc.data()).toList();
+      isLoadingBlogs = false;
+    });
+  }
 
-  //     final position = await Geolocator.getCurrentPosition();
-  //     final placemarks =
-  //         await placemarkFromCoordinates(position.latitude, position.longitude);
-  //     final place = placemarks.first;
+  Future<void> fetchMarketProducts() async {
+    final snapshot =
+        await FirebaseFirestore.instance.collection('marketProducts').get();
 
-  //     setState(() {
-  //       // Show only country or a full label as needed
-  //       // userLocation = "${place.locality}, ${place.country}";
-  //       // userLocation = "${place.administrativeArea}, ${place.country}";
-  //       userLocation = place.country ?? "Unknown Country";
-  //       weatherFuture = WeatherService()
-  //           .fetchWeather(position.latitude, position.longitude);
-  //     });
-  //     // setState(() {
-  //     //   userLocation = "${place.administrativeArea}, ${place.country}";
-  //     //   weatherFuture = WeatherService()
-  //     //       .fetchWeather(position.latitude, position.longitude);
-  //     // });
-  //   } catch (e) {
-  //     print("Location error: $e");
-  //     setState(() {
-  //       userLocation = "Location unavailable";
-  //     });
-  //   }
-  // }
+    setState(() {
+      marketProducts = snapshot.docs
+          .map((doc) => MarketProduct.fromJson(doc.data()))
+          .toList();
+    });
+  }
 
   Future<void> _determinePosition() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // Check if location services are enabled
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       setState(() {
@@ -82,10 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Check permission status
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      // Request permission
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         setState(() {
@@ -104,17 +97,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      // Get current position
       final position = await Geolocator.getCurrentPosition();
-
-      // Convert lat/lon to human-readable address
       final placemarks =
           await placemarkFromCoordinates(position.latitude, position.longitude);
       final place = placemarks.first;
 
       setState(() {
-        // Customize location display as you like:
         userLocation = "${place.locality ?? ''}, ${place.country ?? ''}".trim();
+        weatherFuture = WeatherService()
+            .fetchFullForecast(position.latitude, position.longitude);
       });
     } catch (e) {
       setState(() {
@@ -123,11 +114,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Optional: map API descriptions to user-friendly phrases
+  String friendlyWeather(String desc) {
+    final lower = desc.toLowerCase();
+    if (lower.contains('clear')) return "It's a sunny day";
+    if (lower.contains('rain')) return "It's raining outside";
+    if (lower.contains('cloud')) return "It's cloudy today";
+    if (lower.contains('snow')) return "Snow is falling";
+    if (lower.contains('storm')) return "Stormy weather";
+    return desc[0].toUpperCase() + desc.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final name = user?.displayName ?? 'Guest';
     final screenWidth = MediaQuery.of(context).size.width;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF1F4F8),
       body: SafeArea(
@@ -155,8 +158,32 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.bold,
                             color: Colors.white)),
                     const Gap(4),
-                    const Text("It’s a sunny day",
-                        style: TextStyle(fontSize: 18, color: Colors.white70)),
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: weatherFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          final description =
+                              (snapshot.data!['weather'] as List)
+                                  .first['description'] as String;
+                          return Text(
+                            friendlyWeather(description),
+                            style: const TextStyle(
+                                fontSize: 18, color: Colors.white70),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return const Text(
+                            "Unable to load weather",
+                            style:
+                                TextStyle(fontSize: 18, color: Colors.white70),
+                          );
+                        }
+                        return const Text(
+                          "Loading weather...",
+                          style: TextStyle(fontSize: 18, color: Colors.white70),
+                        );
+                      },
+                    ),
                     const Gap(10),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -223,31 +250,59 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const Gap(20),
               _sectionHeader("Market Price",
-                  onTap: () => Get.toNamed('/market-detail')),
+                  onTap: () => Get.toNamed('/marketdetail')),
               const Gap(10),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                      width: (screenWidth - 48) / 2,
-                      child: _marketCard("Basal", "Afgooye",
-                          "assets/images/basal.jpg", "\$5.99/KG")),
-                  SizedBox(
-                      width: (screenWidth - 48) / 2,
-                      child: _marketCard("Yaanyo", "Afgooye",
-                          "assets/images/yaanyo.jpg", "\$5.99/KG")),
-                ],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 0),
+                child: Row(
+                  children: marketProducts.map((product) {
+                    return Container(
+                      width: 160, // fixed width for each card
+                      margin: const EdgeInsets.only(right: 12),
+                      child: GestureDetector(
+                        onTap: () {
+                          Get.to(
+                              () => MarketDetailScreenInner(product: product));
+                        },
+                        child: _marketCard(
+                          product.title,
+                          product.location,
+                          product.imageUrl,
+                          "\$${product.price}/${product.unit}",
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
               const Gap(25),
               _sectionHeader("Recently Posted",
-                  onTap: () => Get.toNamed('/posts')),
+                  onTap: () => Get.toNamed('/blog')),
               const Gap(10),
-              _postCard("Why do green house is important in this decade",
-                  "21 Jan 2025", "assets/images/post1.jpeg"),
-              const Gap(10),
-              _postCard("The importance of farming and it's benefits",
-                  "21 Jan 2025", "assets/images/post2.jpeg"),
+
+              isLoadingBlogs
+                  ? Center(child: CircularProgressIndicator())
+                  : Column(
+                      children: recentBlogs.map((blog) {
+                        return GestureDetector(
+                          onTap: () {
+                            // Navigate to blog detail page and pass blog data
+                            Get.to(() => BlogDetailScreen(blog: blog));
+                          },
+                          child: _postCard(
+                            blog['title'] ?? '',
+                            blog['date'] ?? '',
+                            blog['imageUrl'] ?? '',
+                          ),
+                        );
+                      }).toList(),
+                    ),
+              // _postCard("Why do green house is important in this decade",
+              //     "21 Jan 2025", "assets/images/post1.jpeg"),
+              // const Gap(10),
+              // _postCard("The importance of farming and it's benefits",
+              //     "21 Jan 2025", "assets/images/post2.jpeg"),
             ],
           ),
         ),
@@ -263,20 +318,24 @@ class _HomeScreenState extends State<HomeScreen> {
               Get.toNamed('/home');
               break;
             case 1:
-              Get.toNamed('/market-detail');
+              Get.toNamed('/marketdetail');
               break;
             case 2:
-              Get.toNamed('/chat');
+              Get.toNamed('/blog');
               break;
             case 3:
-              Get.toNamed('/profile');
+              Get.toNamed('/chat');
               break;
+            case 4:
+              Get.toNamed('/profile');
           }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
               icon: Icon(Icons.show_chart), label: 'Market'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.article_outlined), label: 'Blog'),
           BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome), label: 'Chat AI'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
@@ -313,10 +372,9 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 6,
+              offset: const Offset(0, 3))
         ],
       ),
       child: Column(
@@ -324,11 +382,18 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
+            child: Image.network(
               image,
               height: 90,
               width: double.infinity,
               fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return const Center(child: CircularProgressIndicator());
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.broken_image, size: 90);
+              },
             ),
           ),
           const Gap(8),
@@ -351,40 +416,78 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _postCard(String title, String date, String image) {
-    return GestureDetector(
-      onTap: () => Get.toNamed('/post-detail'),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child:
-                  Image.asset(image, height: 80, width: 100, fit: BoxFit.cover),
+  Widget _postCard(String title, String date, String imageUrl) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: imageUrl.isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    height: 80,
+                    width: 100,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.broken_image, size: 80),
+                  )
+                : const Icon(Icons.broken_image, size: 80),
+          ),
+          const Gap(12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(date,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                const Gap(4),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
             ),
-            const Gap(12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(date,
-                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  const Gap(4),
-                  Text(title,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+
+  // Widget _postCard(String title, String date, String image) {
+  //   return GestureDetector(
+  //     onTap: () => Get.toNamed('/post-detail'),
+  //     child: Container(
+  //       padding: const EdgeInsets.all(10),
+  //       decoration: BoxDecoration(
+  //           color: Colors.white, borderRadius: BorderRadius.circular(12)),
+  //       child: Row(
+  //         children: [
+  //           ClipRRect(
+  //               borderRadius: BorderRadius.circular(12),
+  //               child: Image.asset(image,
+  //                   height: 80, width: 100, fit: BoxFit.cover)),
+  //           const Gap(12),
+  //           Expanded(
+  //             child: Column(
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 Text(date,
+  //                     style: const TextStyle(color: Colors.grey, fontSize: 12)),
+  //                 const Gap(4),
+  //                 Text(title,
+  //                     style: const TextStyle(fontWeight: FontWeight.bold)),
+  //               ],
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _weatherItem(String emoji, String value, String label,
       {Color? bgColor}) {
@@ -394,13 +497,8 @@ class _HomeScreenState extends State<HomeScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: bgColor ?? Colors.grey.shade200,
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            emoji,
-            style: const TextStyle(fontSize: 24),
-          ),
+              color: bgColor ?? Colors.grey.shade200, shape: BoxShape.circle),
+          child: Text(emoji, style: const TextStyle(fontSize: 24)),
         ),
         const SizedBox(height: 6),
         Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -416,9 +514,7 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
+          color: Colors.white, borderRadius: BorderRadius.circular(18)),
       child: Wrap(
         spacing: 16,
         runSpacing: 16,

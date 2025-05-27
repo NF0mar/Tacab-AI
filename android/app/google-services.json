@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "612599198984",
-    "project_id": "tacab-ai",
-    "storage_bucket": "tacab-ai.firebasestorage.app"
+    "project_number": "672507171917",
+    "project_id": "nursdb-c1628",
+    "storage_bucket": "nursdb-c1628.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:612599198984:android:167e2b86fbb899f05068bd",
+        "mobilesdk_app_id": "1:672507171917:android:1d0f17eb1315742eeeb804",
         "android_client_info": {
           "package_name": "com.example.tacab_ai"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBZKzRddJRJNUZ0pkunnQ9pRAvA7cR2ZZc"
+          "current_key": "AIzaSyC1SVtKcOEioeckeuR2qfi-1LtCNkMqJdw"
         }
       ],
       "services": {

@@ -4,15 +4,18 @@ import 'package:gap/gap.dart';
 import 'package:get/get.dart';
 import 'package:tacab_ai/features/authentication/controllers/auth.dart';
 import 'package:tacab_ai/features/authentication/controllers/app_data.dart';
+import 'package:tacab_ai/features/home/screens/AboutUsScreen.dart';
+import 'package:tacab_ai/features/home/screens/edit_profile_page.dart';
 import 'package:tacab_ai/features/home/screens/settingscreen.dart';
 import 'package:tacab_ai/features/home/screens/ConfirmDialogs.dart';
-import 'package:tacab_ai/features/home/screens/blogscreen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     void logout() async {
       try {
         await authService.value.signOut();
@@ -47,21 +50,29 @@ class ProfileScreen extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 30,
-                  backgroundImage: AssetImage('assets/images/profile.jpg'),
+                  backgroundImage: user?.photoURL != null
+                      ? NetworkImage(user!.photoURL!)
+                      : const AssetImage('assets/images/profile.jpg')
+                          as ImageProvider,
                 ),
                 const Gap(12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text("Nur Farah",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16)),
-                    Text("Banaadir",
-                        style: TextStyle(color: Colors.white70, fontSize: 14))
+                  children: [
+                    Text(
+                      user?.displayName ?? 'No Name',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16),
+                    ),
+                    Text(
+                      user?.email ?? 'No Email',
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
                   ],
                 ),
                 const Spacer(),
@@ -71,22 +82,19 @@ class ProfileScreen extends StatelessWidget {
                     color: Colors.white24,
                   ),
                   padding: const EdgeInsets.all(4),
-                  child: const Icon(Icons.edit, color: Colors.white, size: 20),
-                )
+                  child: GestureDetector(
+                    onTap: () {
+                      // Navigate to Edit Profile Page
+                      Get.to(() => const EditProfilePage());
+                    },
+                    child:
+                        const Icon(Icons.edit, color: Colors.white, size: 20),
+                  ),
+                ),
               ],
             ),
           ),
           const Gap(30),
-          _buildTile(
-            icon: Icons.article_outlined,
-            title: "Blog",
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BlogScreen()),
-              );
-            },
-          ),
           _buildTile(
             icon: Icons.settings,
             title: "Setting",
@@ -97,7 +105,15 @@ class ProfileScreen extends StatelessWidget {
               );
             },
           ),
-          _buildTile(icon: Icons.info_outline, title: "About Us", onTap: () {}),
+          _buildTile(
+              icon: Icons.info_outline,
+              title: "About Us",
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AboutUsScreen()),
+                );
+              }),
           _buildTile(
             icon: Icons.logout,
             title: "Logout",
@@ -111,23 +127,6 @@ class ProfileScreen extends StatelessWidget {
               }
             },
           ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 3,
-        selectedItemColor: const Color(0xFF73964A),
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        onTap: (index) {
-          // TODO: Handle navigation to other tabs
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.show_chart), label: 'Market'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.auto_awesome), label: 'Chat AI'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );

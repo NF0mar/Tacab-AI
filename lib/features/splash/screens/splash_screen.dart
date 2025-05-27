@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -9,12 +11,37 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  @override
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   FirebaseAuth.instance.authStateChanges().listen((user) {
+  //   Future.delayed(const Duration(seconds: 3), () {
+  //     if (mounted) {
+  //       User? user = FirebaseAuth.instance.currentUser;
+  //       if (user != null) {
+  //         // User is logged in, go to Home
+  //         Get.offNamed('/home');
+  //       } else {
+  //         // User is not logged in, go to Signup
+  //         Get.offNamed('/signup');
+  //       }
+  //     }
+  //   });
+  // });
+  // }
+@override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
+
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted) return;
+
+      if (user == null) {
+        // No user logged in, go to signup immediately
         Get.offNamed('/signup');
+      } else {
+        // User logged in, go to home immediately
+        Get.offNamed('/home');
       }
     });
   }

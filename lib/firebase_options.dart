@@ -41,48 +41,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyD40L0kSdR5HQ1rV9_SpEzo6zovqu3j07E',
-    appId: '1:612599198984:web:0243b13d0cfde9a15068bd',
-    messagingSenderId: '612599198984',
-    projectId: 'tacab-ai',
-    authDomain: 'tacab-ai.firebaseapp.com',
-    storageBucket: 'tacab-ai.firebasestorage.app',
-    measurementId: 'G-NC3GG9W9Z4',
+    apiKey: 'AIzaSyARgvIaUA4b_GT8JT66PPEnJou8GjcRtvI',
+    appId: '1:672507171917:web:58556eeb85874ff9eeb804',
+    messagingSenderId: '672507171917',
+    projectId: 'nursdb-c1628',
+    authDomain: 'nursdb-c1628.firebaseapp.com',
+    storageBucket: 'nursdb-c1628.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBZKzRddJRJNUZ0pkunnQ9pRAvA7cR2ZZc',
-    appId: '1:612599198984:android:167e2b86fbb899f05068bd',
-    messagingSenderId: '612599198984',
-    projectId: 'tacab-ai',
-    storageBucket: 'tacab-ai.firebasestorage.app',
+    apiKey: 'AIzaSyC1SVtKcOEioeckeuR2qfi-1LtCNkMqJdw',
+    appId: '1:672507171917:android:1d0f17eb1315742eeeb804',
+    messagingSenderId: '672507171917',
+    projectId: 'nursdb-c1628',
+    storageBucket: 'nursdb-c1628.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDzhae-06rsuT9av8KDIKalWmLW2QWPYeU',
-    appId: '1:612599198984:ios:93a8e907af8fe4155068bd',
-    messagingSenderId: '612599198984',
-    projectId: 'tacab-ai',
-    storageBucket: 'tacab-ai.firebasestorage.app',
+    apiKey: 'AIzaSyD71uWHzp3zGd6jEY9YKSY9kDRyiaGrxMA',
+    appId: '1:672507171917:ios:b416293ab420b9eceeb804',
+    messagingSenderId: '672507171917',
+    projectId: 'nursdb-c1628',
+    storageBucket: 'nursdb-c1628.firebasestorage.app',
     iosBundleId: 'com.example.tacabAi',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDzhae-06rsuT9av8KDIKalWmLW2QWPYeU',
-    appId: '1:612599198984:ios:93a8e907af8fe4155068bd',
-    messagingSenderId: '612599198984',
-    projectId: 'tacab-ai',
-    storageBucket: 'tacab-ai.firebasestorage.app',
+    apiKey: 'AIzaSyD71uWHzp3zGd6jEY9YKSY9kDRyiaGrxMA',
+    appId: '1:672507171917:ios:b416293ab420b9eceeb804',
+    messagingSenderId: '672507171917',
+    projectId: 'nursdb-c1628',
+    storageBucket: 'nursdb-c1628.firebasestorage.app',
     iosBundleId: 'com.example.tacabAi',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyD40L0kSdR5HQ1rV9_SpEzo6zovqu3j07E',
-    appId: '1:612599198984:web:c99668047cd686ee5068bd',
-    messagingSenderId: '612599198984',
-    projectId: 'tacab-ai',
-    authDomain: 'tacab-ai.firebaseapp.com',
-    storageBucket: 'tacab-ai.firebasestorage.app',
-    measurementId: 'G-FLSR4KXZ3V',
+    apiKey: 'AIzaSyARgvIaUA4b_GT8JT66PPEnJou8GjcRtvI',
+    appId: '1:672507171917:web:4e6cfe8bc657c932eeb804',
+    messagingSenderId: '672507171917',
+    projectId: 'nursdb-c1628',
+    authDomain: 'nursdb-c1628.firebaseapp.com',
+    storageBucket: 'nursdb-c1628.firebasestorage.app',
   );
 }

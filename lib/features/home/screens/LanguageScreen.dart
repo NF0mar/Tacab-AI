@@ -9,7 +9,7 @@ class LanguageScreen extends StatefulWidget {
 }
 
 class _LanguageScreenState extends State<LanguageScreen> {
-  final List<String> languages = ['English', 'Somali', 'Arabic', 'French'];
+  final List<String> languages = ['English', 'Somali'];
   String? selectedLanguage;
 
   @override
@@ -48,7 +48,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: languages.length,
-        separatorBuilder: (context, index) => const Divider(height: 1, thickness: 0.4),
+        separatorBuilder: (context, index) =>
+            const Divider(height: 1, thickness: 0.4),
         itemBuilder: (context, index) {
           final lang = languages[index];
           return ListTile(
