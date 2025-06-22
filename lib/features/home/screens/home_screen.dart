@@ -7,8 +7,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:tacab_ai/features/home/screens/BlogDetailScreen.dart';
 import 'package:tacab_ai/features/home/screens/MarketDetailScreenInner.dart';
-import 'package:tacab_ai/features/home/screens/market_detail_screen.dart';
-import 'package:tacab_ai/features/home/screens/market_products.dart';
+// import 'package:tacab_ai/features/home/screens/market_detail_screen.dart';
+// import 'package:tacab_ai/features/home/screens/market_products.dart';
 import 'weather_service.dart';
 import 'package:tacab_ai/features/home/models/market_product.dart';
 

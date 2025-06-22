@@ -112,7 +112,7 @@ import 'package:gap/gap.dart';
 import 'package:tacab_ai/features/home/screens/BlogDetailScreen.dart';
 
 class BlogScreen extends StatefulWidget {
-  const BlogScreen({Key? key}) : super(key: key);
+  const BlogScreen({super.key});
 
   @override
   State<BlogScreen> createState() => _BlogScreenState();
@@ -225,7 +225,7 @@ class _BlogScreenState extends State<BlogScreen> {
           const Gap(20),
 
           // Other blogs
-          ...otherBlogs.map((blog) => _blogItem(blog)).toList(),
+          ...otherBlogs.map((blog) => _blogItem(blog)),
         ],
       ),
     );

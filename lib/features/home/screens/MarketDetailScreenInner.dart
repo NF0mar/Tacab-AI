@@ -55,8 +55,7 @@ import 'package:tacab_ai/features/home/models/market_product.dart';
 class MarketDetailScreenInner extends StatelessWidget {
   final MarketProduct product;
 
-  const MarketDetailScreenInner({Key? key, required this.product})
-      : super(key: key);
+  const MarketDetailScreenInner({super.key, required this.product});
 
   @override
   Widget build(BuildContext context) {

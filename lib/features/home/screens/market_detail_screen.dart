@@ -57,7 +57,7 @@ import 'package:tacab_ai/features/home/models/market_product.dart';
 import 'package:tacab_ai/features/home/screens/MarketDetailScreenInner.dart';
 
 class MarketDetailScreen extends StatefulWidget {
-  const MarketDetailScreen({Key? key}) : super(key: key);
+  const MarketDetailScreen({super.key});
 
   @override
   State<MarketDetailScreen> createState() => _MarketDetailScreenState();
