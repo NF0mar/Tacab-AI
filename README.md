@@ -1,6 +1,6 @@
  <h1 align="center">Welcome to Tacab AI 👋</h1>
 
-*<h6 align='center'>Empowering Farmers with Intelligent, Seamless Agriculture Solutions</h6>*
+*<h3 align='center'>Empowering Farmers with Intelligent, Seamless Agriculture Solutions</h3>*
 
 
 ---
