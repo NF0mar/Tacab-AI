@@ -1,11 +1,11 @@
  <h1 align="center">Welcome to Tacab AI 👋</h1>
 
-*<center>Empowering Farmers with Intelligent, Seamless Agriculture Solutions</center>*
+*<h6 align='center'>Empowering Farmers with Intelligent, Seamless Agriculture Solutions</h6>*
 
 
 ---
 
-*<center>Built with the tools and technologies:</center>*
+*<p align='center'>Built with the tools and technologies:</p>*
 
 <p align="center">
   <a href="https://flutter.dev/"><img src="https://img.shields.io/badge/Flutter-grey?style=flat&logo=flutter&logoColor=0175C2" alt="Flutter"/></a>
