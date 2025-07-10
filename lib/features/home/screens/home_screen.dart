@@ -98,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final position = await Geolocator.getCurrentPosition();
+      // await Future.delayed(Duration(milliseconds: 500));
       final placemarks =
           await placemarkFromCoordinates(position.latitude, position.longitude);
       final place = placemarks.first;
@@ -261,9 +262,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: 160, // fixed width for each card
                       margin: const EdgeInsets.only(right: 12),
                       child: GestureDetector(
-                        onTap: () {
-                          Get.to(
-                              () => MarketDetailScreenInner(product: product));
+                        onTap: () async {
+                          await Get.to( () => MarketDetailScreenInner(product: product));
                         },
                         child: _marketCard(
                           product.title,

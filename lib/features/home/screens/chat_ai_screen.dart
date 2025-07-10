@@ -11,8 +11,6 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-
-
 class ChatAIScreen extends StatefulWidget {
   const ChatAIScreen({super.key});
 
@@ -43,6 +41,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   String _recordingStatus = '';
   final String? userId = FirebaseAuth.instance.currentUser?.uid;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _currentConversationId;
 
   final TextEditingController _controller = TextEditingController();
   File? _selectedImage; // Holds image before sending
@@ -65,6 +64,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     });
     _warmUpTacabApis();
     _loadChatHistory();
+    _startNewConversation();
     _loadUserProfile();
   }
 
@@ -89,35 +89,49 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     );
   }
 
-  Future<void> _loadChatHistory() async {
+Future<void> _loadChatHistory() async {
     if (userId == null) return;
 
     try {
       final snapshot = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('chat_history')
-          .orderBy('timestamp', descending: false)
+          .collection('conversations')
+          .orderBy('created_at', descending: true)
           .get();
 
-      final loadedMessages = <ChatMessage>[];
       final loadedPairs = <Map<String, String?>>[];
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        loadedMessages
-            .add(ChatMessage(text: data['user_message'], sender: Sender.user));
-        loadedMessages
-            .add(ChatMessage(text: data['ai_response'], sender: Sender.ai));
+
+        final messages = List.from(data['messages'] ?? []);
+
+        String? firstUserMessage;
+        String? firstAiResponse;
+
+        final userMsg = messages.firstWhere(
+          (m) => m['sender'] == 'user',
+          orElse: () => null,
+        );
+        firstUserMessage = userMsg?['text'];
+
+
+        final aiMsg = messages.firstWhere(
+          (m) => m['sender'] == 'ai',
+          orElse: () => null,
+        );
+        firstAiResponse = aiMsg?['text'];
+
+
         loadedPairs.add({
-          'user_message': data['user_message'] as String?,
-          'ai_response': data['ai_response'] as String?,
+          'user_message': firstUserMessage,
+          'ai_response': firstAiResponse,
+          'conversation_id': doc.id,
         });
       }
 
       setState(() {
-        _messages.clear();
-        _messages.addAll(loadedMessages);
         _chatHistoryPairs = loadedPairs;
       });
     } catch (e) {
@@ -125,29 +139,107 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     }
   }
 
+ 
+  // Future<void> _loadChatHistory() async {
+  //   if (userId == null) return;
+
+  //   try {
+  //     final snapshot = await _firestore
+  //         .collection('users')
+  //         .doc(userId)
+  //         .collection('chat_history')
+  //         .orderBy('timestamp', descending: false)
+  //         .get();
+
+  //     final loadedMessages = <ChatMessage>[];
+  //     final loadedPairs = <Map<String, String?>>[];
+
+  //     for (var doc in snapshot.docs) {
+  //       final data = doc.data();
+  //       loadedMessages
+  //           .add(ChatMessage(text: data['user_message'], sender: Sender.user));
+  //       loadedMessages
+  //           .add(ChatMessage(text: data['ai_response'], sender: Sender.ai));
+  //       loadedPairs.add({
+  //         'user_message': data['user_message'] as String?,
+  //         'ai_response': data['ai_response'] as String?,
+  //       });
+  //     }
+
+  //     setState(() {
+  //       _messages.clear();
+  //       _messages.addAll(loadedMessages);
+  //       _chatHistoryPairs = loadedPairs;
+  //     });
+  //   } catch (e) {
+  //     print("Failed to load chat history: $e");
+  //   }
+  // }
+Future<void> _startNewConversation() async {
+    if (userId == null) return;
+    final doc = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('conversations')
+        .add({
+      'messages': [],
+      'created_at': FieldValue.serverTimestamp(),
+    });
+    _currentConversationId = doc.id;
+
+    setState(() {
+      _messages.clear();
+    });
+
+    await _loadChatHistory();
+  }
+
+
   Future<void> _saveChatToFirestore(String userText, String aiText) async {
-    if (userId == null) {
-      print("User not logged in, skipping Firestore save");
+    // if (userId == null) {
+    //   print("User not logged in, skipping Firestore save");
+    //   return;
+    // }
+    // try {
+    //   await _firestore
+    //       .collection('users')
+    //       .doc(userId)
+    //       .collection('chat_history')
+    //       .add({
+    //     'user_message': userText,
+    //     'ai_response': aiText,
+    //     'timestamp': FieldValue.serverTimestamp(),
+    //   });
+    //   print("Chat saved to Firestore");
+    //   // Also update drawer list in real time
+    //   setState(() {
+    //     _chatHistoryPairs
+    //         .add({'user_message': userText, 'ai_response': aiText});
+    //   });
+    // } catch (e) {
+    //   print("Failed to save chat to Firestore: $e");
+    // }
+
+    if (_currentConversationId == null) {
+      print("No active conversation");
       return;
     }
+
     try {
-      await _firestore
+      final docRef = _firestore
           .collection('users')
           .doc(userId)
-          .collection('chat_history')
-          .add({
-        'user_message': userText,
-        'ai_response': aiText,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      print("Chat saved to Firestore");
-      // Also update drawer list in real time
-      setState(() {
-        _chatHistoryPairs
-            .add({'user_message': userText, 'ai_response': aiText});
+          .collection('conversations')
+          .doc(_currentConversationId);
+
+      await docRef.update({
+        'messages': FieldValue.arrayUnion([
+          {'text': userText, 'sender': 'user'},
+          {'text': aiText, 'sender': 'ai'},
+        ])
       });
     } catch (e) {
-      print("Failed to save chat to Firestore: $e");
+      print("Failed to save chat: $e");
     }
   }
 
@@ -202,7 +294,6 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
 //     }
 //   }
 
-
   void _toggleRecording() async {
     if (!_isRecording) {
       Directory tempDir = await getTemporaryDirectory();
@@ -212,7 +303,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
       print('🎙️ Starting recorder at path: $path');
       await _recorder.startRecorder(
         toFile: path,
-        codec: Codec.aacMP4 ,
+        codec: Codec.aacMP4,
         sampleRate: 16000, // ✅ must match model's expected rate
         numChannels: 1, // ✅ must be mono
       );
@@ -245,7 +336,6 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
       }
     }
     print('📤 Recording stopped. File path: $recordingPath');
-
 
     if (recordingPath == null || !File(recordingPath).existsSync()) {
       setState(() {
@@ -323,7 +413,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
 //     }
 //   }
 
-Future<void> _sendAudioToASR(String filePath) async {
+  Future<void> _sendAudioToASR(String filePath) async {
     setState(() {
       _isTranscribing = true;
       _recordingStatus = 'Converting audio...';
@@ -351,8 +441,8 @@ Future<void> _sendAudioToASR(String filePath) async {
         });
 
         // 🔁 Send the converted file to your Hugging Face ASR
-        final asrUri =
-            Uri.parse("https://tacab-asr-transcription.hf.space/transcribe");
+        final asrUri = Uri.parse("https://tacab-asr2025.hf.space/transcribe");
+        // Uri.parse("https://tacab-asr-transcription.hf.space/transcribe");
         final asrRequest = http.MultipartRequest("POST", asrUri);
         asrRequest.files
             .add(await http.MultipartFile.fromPath("file", convertedFilePath));
@@ -403,7 +493,6 @@ Future<void> _sendAudioToASR(String filePath) async {
       });
     }
   }
-
 
 // Future<void> _sendAudioToASR(String filePath) async {
 //     setState(() {
@@ -552,9 +641,11 @@ Future<void> _sendAudioToASR(String filePath) async {
 
     try {
       final response = await http.post(
-        Uri.parse("https://tacab-somali-textgen.hf.space/generate"),
+        Uri.parse("https://tacab-somali-agriculture-app.hf.space/generate"),
         headers: {"Content-Type": "application/json"},
-        body: json.encode({"inputs": userText}),
+        body: json.encode({"prompt": userText}),
+        // body: json.encode(
+        //     {"prompt": userText, "max_length": 128, "temperature": 0.7}),
       );
 
       if (response.statusCode == 200) {
@@ -698,12 +789,67 @@ Future<void> _sendAudioToASR(String filePath) async {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            onTap: () {
+                            onTap: () async {
+                              final docId = pair['conversation_id'];
+                              if (docId == null) return;
+
+                              final doc = await _firestore
+                                  .collection('users')
+                                  .doc(userId)
+                                  .collection('conversations')
+                                  .doc(docId)
+                                  .get();
+
+                              final data = doc.data();
+                              final messages =
+                                  List.from(data?['messages'] ?? []);
+
+                              setState(() {
+                                _currentConversationId = docId;
+                                _messages.clear();
+                                _messages.addAll(
+                                  messages.map((m) => ChatMessage(
+                                        text: m['text'],
+                                        sender: m['sender'] == 'user'
+                                            ? Sender.user
+                                            : Sender.ai,
+                                      )),
+                                );
+                                _controller.clear();
+                                _selectedImage = null;
+                              });
+
                               Navigator.pop(context);
                             },
+
+                            // onTap: () {
+                            //   Navigator.pop(context);
+                            // },
                           );
                         },
                       ),
+
+                // : ListView.builder(
+                //     itemCount: _chatHistoryPairs.length,
+                //     itemBuilder: (context, index) {
+                //       final pair = _chatHistoryPairs[index];
+                //       return ListTile(
+                //         title: Text(
+                //           pair['user_message'] ?? '',
+                //           maxLines: 1,
+                //           overflow: TextOverflow.ellipsis,
+                //         ),
+                //         subtitle: Text(
+                //           pair['ai_response'] ?? '',
+                //           maxLines: 1,
+                //           overflow: TextOverflow.ellipsis,
+                //         ),
+                //         onTap: () {
+                //           Navigator.pop(context);
+                //         },
+                //       );
+                //     },
+                //   ),
               ),
             ],
           ),
