@@ -10,6 +10,9 @@ import 'package:tacab_ai/features/home/screens/tacab_tts.dart';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tacab_ai/features/home/screens/chat_history.dart';
+import 'dart:async' show unawaited;
+
 
 class ChatAIScreen extends StatefulWidget {
   const ChatAIScreen({super.key});
@@ -55,6 +58,12 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   bool get hasText => _controller.text.trim().isNotEmpty;
 
   String? _photoUrl;
+
+// How many recent messages to include every time.
+  static const int _contextTurns = 12;
+
+// Local cache of the long-term memory summary for the active conversation.
+  String _conversationSummary = '';
 
   @override
   void initState() {
@@ -117,44 +126,11 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
 
   Future<void> _loadChatHistory() async {
     if (userId == null) return;
-
     try {
-      final snapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('conversations')
-          .orderBy('created_at', descending: true)
-          .get();
-
-      final loadedPairs = <Map<String, String?>>[];
-
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-
-        final messages = List.from(data['messages'] ?? []);
-
-        String? firstUserMessage;
-        String? firstAiResponse;
-
-        final userMsg = messages.firstWhere(
-          (m) => m['sender'] == 'user',
-          orElse: () => null,
-        );
-        firstUserMessage = userMsg?['text'];
-
-        final aiMsg = messages.firstWhere(
-          (m) => m['sender'] == 'ai',
-          orElse: () => null,
-        );
-        firstAiResponse = aiMsg?['text'];
-
-        loadedPairs.add({
-          'user_message': firstUserMessage,
-          'ai_response': firstAiResponse,
-          'conversation_id': doc.id,
-        });
-      }
-
+      final loadedPairs = await ChatHistory.loadHistoryPairs(
+        firestore: _firestore,
+        userId: userId!,
+      );
       setState(() {
         _chatHistoryPairs = loadedPairs;
       });
@@ -165,42 +141,38 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
 
   Future<void> _startNewConversation() async {
     if (userId == null) return;
-    final doc = await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('conversations')
-        .add({
-      'messages': [],
-      'created_at': FieldValue.serverTimestamp(),
-    });
-    _currentConversationId = doc.id;
+    try {
+      final id = await ChatHistory.startNewConversation(
+        firestore: _firestore,
+        userId: userId!,
+      );
+      _currentConversationId = id;
+      _conversationSummary = '';
 
-    setState(() {
-      _messages.clear();
-    });
+      setState(() {
+        _messages.clear();
+      });
 
-    await _loadChatHistory();
+      await _loadChatHistory();
+    } catch (e) {
+      print("Failed to start conversation: $e");
+    }
   }
 
   Future<void> _saveChatToFirestore(String userText, String aiText) async {
-    if (_currentConversationId == null) {
+    if (_currentConversationId == null || userId == null) {
       print("No active conversation");
       return;
     }
 
     try {
-      final docRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('conversations')
-          .doc(_currentConversationId);
-
-      await docRef.update({
-        'messages': FieldValue.arrayUnion([
-          {'text': userText, 'sender': 'user'},
-          {'text': aiText, 'sender': 'ai'},
-        ])
-      });
+      await ChatHistory.saveExchange(
+        firestore: _firestore,
+        userId: userId!,
+        conversationId: _currentConversationId!,
+        userText: userText,
+        aiText: aiText,
+      );
     } catch (e) {
       print("Failed to save chat: $e");
     }
@@ -355,6 +327,14 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     }
   }
 
+  String _formatDateYMD(String? iso) {
+    if (iso == null || iso.isEmpty) return '';
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return '';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${dt.year}-${two(dt.month)}-${two(dt.day)}'; // e.g. 2025-09-24
+  }
+
   // Future<void> _pickImage({bool fromCamera = false}) async {
   //   final picker = ImagePicker();
   //   final pickedFile = await picker.pickImage(
@@ -378,6 +358,120 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     }
   }
 
+  bool _shouldSummarize() {
+    // Summarize every 10 messages OR when the prompt would get too long.
+    return _messages.length % 10 == 0 ||
+        _buildConversationPrompt("").length > 3000;
+  }
+
+  Future<void> _summarizeAndPersist() async {
+    if (_currentConversationId == null || userId == null) return;
+
+    // Build a compact transcript to summarize (last ~30 messages).
+    final start = _messages.length - 30;
+    final recent = _messages.sublist(start < 0 ? 0 : start);
+
+    final summaryPrompt = StringBuffer()
+      ..writeln(
+          "Summarize the following chat into a short memory for Tacab AI ")
+      ..writeln("that helps continue the conversation naturally. "
+          "Keep it in Somali. Capture lasting user facts, preferences, "
+          "goals, and unresolved follow-ups. 3–6 short bullets. "
+          "Do NOT repeat the whole conversation.")
+      ..writeln("\n### Chat")
+      ..writeln(recent.map((m) {
+        final role = (m.sender == Sender.user) ? "User" : "Assistant";
+        return "$role: ${(m.text ?? '').trim()}";
+      }).join("\n"))
+      ..writeln("\n### Memory bullets:");
+
+    try {
+      final uri = Uri.parse('https://nurfarah57-txt-generation.hf.space/ask');
+      final payload = <String, dynamic>{
+        'question': summaryPrompt.toString(),
+        'max_new_tokens': 200,
+        'force_fallback': false,
+        'lang': 'so',
+      };
+
+      final resp = await http
+          .post(
+            uri,
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: json.encode(payload),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (resp.statusCode == 200) {
+        final body = utf8.decode(resp.bodyBytes);
+        String summary = "";
+        try {
+          final decoded = json.decode(body);
+          if (decoded is Map) {
+            if (decoded['answer'] is String &&
+                (decoded['answer'] as String).trim().isNotEmpty) {
+              summary = (decoded['answer'] as String).trim();
+            } else if (decoded['generated_text'] is String &&
+                (decoded['generated_text'] as String).trim().isNotEmpty) {
+              summary = (decoded['generated_text'] as String).trim();
+            } else if (decoded['text'] is String &&
+                (decoded['text'] as String).trim().isNotEmpty) {
+              summary = (decoded['text'] as String).trim();
+            }
+          }
+        } catch (_) {}
+
+        if (summary.isNotEmpty) {
+          setState(() => _conversationSummary = summary);
+          await ChatHistory.setSummary(
+            firestore: _firestore,
+            userId: userId!,
+            conversationId: _currentConversationId!,
+            summary: summary,
+          );
+        }
+      }
+    } catch (_) {
+      // Silent fail: memory is optional; chat keeps working.
+    }
+  }
+
+  String _buildConversationPrompt(String latestUserText) {
+    final buf = StringBuffer();
+
+    // Gentle, natural system guidance for the model's style.
+    buf.writeln("### Instructions");
+    buf.writeln("You are Tacab AI, a friendly, concise assistant. "
+        "Keep continuity with the chat history and the memory. "
+        "Default to Somali unless the user uses another language. "
+        "Use 2–5 short sentences, be natural, and ask at most one clarifying question only if needed.");
+
+    // Long-term memory summary (if any).
+    if (_conversationSummary.trim().isNotEmpty) {
+      buf.writeln("\n### Memory");
+      buf.writeln(_conversationSummary.trim());
+    }
+
+    // Short-term rolling context.
+    buf.writeln("\n### Dialogue");
+    final start = _messages.length - _contextTurns;
+    final recent = _messages.sublist(start < 0 ? 0 : start);
+    for (final m in recent) {
+      final role = (m.sender == Sender.user) ? "User" : "Assistant";
+      final text = (m.text ?? "").trim();
+      if (text.isEmpty) continue;
+      buf.writeln("$role: $text");
+    }
+
+    // Latest user turn to answer now.
+    buf.writeln("User: $latestUserText");
+    buf.writeln("Assistant:");
+    return buf.toString();
+  }
+
   Future<void> _submitMessage() async {
     // if (_controller.text.trim().isEmpty && _selectedImage == null) return;
     if (_controller.text.trim().isEmpty) return;
@@ -397,12 +491,21 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
 
     try {
       final uri = Uri.parse('https://nurfarah57-txt-generation.hf.space/ask');
+      final prompt = _buildConversationPrompt(userText);
+
       final payload = <String, dynamic>{
-        'question': userText,
+        'question': prompt,
         'max_new_tokens': 384,
         'force_fallback': false,
         'lang': 'so',
       };
+
+      // final payload = <String, dynamic>{
+      //   'question': userText,
+      //   'max_new_tokens': 384,
+      //   'force_fallback': false,
+      //   'lang': 'so',
+      // };
 
       // Retry a couple of times on gateway/cold-start errors.
       const transient = {502, 503, 504};
@@ -471,6 +574,10 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
         // Speak it and persist
         await _convertTextToSpeech(aiText);
         await _saveChatToFirestore(userText, aiText);
+
+        if (_shouldSummarize()) {
+          unawaited(_summarizeAndPersist()); // fire and forget
+        }
       } else {
         setState(() {
           _messages.add(ChatMessage(
@@ -549,35 +656,35 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   //   }
   // }
 
-  void _showImageSourceOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera'),
-                onTap: () {
-                  Navigator.pop(context);
-                  // _pickImage(fromCamera: true);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Gallery'),
-                onTap: () {
-                  Navigator.pop(context);
-                  // _pickImage();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  // void _showImageSourceOptions() {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     builder: (context) {
+  //       return SafeArea(
+  //         child: Wrap(
+  //           children: [
+  //             ListTile(
+  //               leading: const Icon(Icons.camera_alt),
+  //               title: const Text('Camera'),
+  //               onTap: () {
+  //                 Navigator.pop(context);
+  //                 // _pickImage(fromCamera: true);
+  //               },
+  //             ),
+  //             ListTile(
+  //               leading: const Icon(Icons.photo_library),
+  //               title: const Text('Gallery'),
+  //               onTap: () {
+  //                 Navigator.pop(context);
+  //                 // _pickImage();
+  //               },
+  //             ),
+  //           ],
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -648,6 +755,60 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
                         itemCount: _chatHistoryPairs.length,
                         itemBuilder: (context, index) {
                           final pair = _chatHistoryPairs[index];
+                          // return ListTile(
+                          //   title: Text(
+                          //     pair['user_message'] ?? '',
+                          //     maxLines: 1,
+                          //     overflow: TextOverflow.ellipsis,
+                          //   ),
+                          //   subtitle: Text(
+                          //     pair['ai_response'] ?? '',
+                          //     maxLines: 1,
+                          //     overflow: TextOverflow.ellipsis,
+                          //   ),
+                          //   onTap: () async {
+                          //     final docId = pair['conversation_id'];
+                          //     if (docId == null) return;
+
+                          //     // final doc = await _firestore
+                          //     //     .collection('users')
+                          //     //     .doc(userId)
+                          //     //     .collection('conversations')
+                          //     //     .doc(docId)
+                          //     //     .get();
+
+                          //     // final data = doc.data();
+                          //     // final messages =
+                          //     //     List.from(data?['messages'] ?? []);
+                          //     final messages =
+                          //         await ChatHistory.loadConversationMessages(
+                          //       firestore: _firestore,
+                          //       userId: userId!,
+                          //       conversationId: docId,
+                          //     );
+
+                          //     setState(() {
+                          //       _currentConversationId = docId;
+                          //       _messages.clear();
+                          //       _messages.addAll(
+                          //         messages.map((m) => ChatMessage(
+                          //               text: m['text'],
+                          //               sender: m['sender'] == 'user'
+                          //                   ? Sender.user
+                          //                   : Sender.ai,
+                          //             )),
+                          //       );
+                          //       _controller.clear();
+                          //       // _selectedImage = null;
+                          //     });
+
+                          //     Navigator.pop(context);
+                          //   },
+
+                          //   // onTap: () {
+                          //   //   Navigator.pop(context);
+                          //   // },
+                          // );
                           return ListTile(
                             title: Text(
                               pair['user_message'] ?? '',
@@ -659,42 +820,57 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            trailing: Text(
+                              _formatDateYMD(
+                                  pair['created_at']), // 👈 shows created date
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.black54),
+                            ),
                             onTap: () async {
                               final docId = pair['conversation_id'];
                               if (docId == null) return;
 
-                              final doc = await _firestore
-                                  .collection('users')
-                                  .doc(userId)
-                                  .collection('conversations')
-                                  .doc(docId)
-                                  .get();
-
-                              final data = doc.data();
                               final messages =
-                                  List.from(data?['messages'] ?? []);
+                                  await ChatHistory.loadConversationMessages(
+                                firestore: _firestore,
+                                userId: userId!,
+                                conversationId: docId,
+                              );
 
+                              final summary = await ChatHistory.getSummary(
+                                firestore: _firestore,
+                                userId: userId!,
+                                conversationId: docId,
+                              );
+
+                              // setState(() {
+                              //   _currentConversationId = docId;
+                              //   _messages
+                              //     ..clear()
+                              //     ..addAll(messages.map((m) => ChatMessage(
+                              //           text: m['text'],
+                              //           sender: m['sender'] == 'user'
+                              //               ? Sender.user
+                              //               : Sender.ai,
+                              //         )));
+                              //   _controller.clear();
+                              // });
                               setState(() {
                                 _currentConversationId = docId;
-                                _messages.clear();
-                                _messages.addAll(
-                                  messages.map((m) => ChatMessage(
+                                _conversationSummary = summary ?? '';
+                                _messages
+                                  ..clear()
+                                  ..addAll(messages.map((m) => ChatMessage(
                                         text: m['text'],
                                         sender: m['sender'] == 'user'
                                             ? Sender.user
                                             : Sender.ai,
-                                      )),
-                                );
+                                      )));
                                 _controller.clear();
-                                // _selectedImage = null;
                               });
 
                               Navigator.pop(context);
                             },
-
-                            // onTap: () {
-                            //   Navigator.pop(context);
-                            // },
                           );
                         },
                       ),
